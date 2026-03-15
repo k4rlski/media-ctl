@@ -446,3 +446,57 @@ WHERE zip = '90210';
 - `curate-radio`: queries `radio` table, references `radio_id` / `altradio_id`
 - Same DOL stats, same confirm flow, same input flexibility
 
+
+---
+
+## Mass-Populate Levels (IMPORTANT for Cursor)
+
+When input resolves to multiple ZIPs, curate-news enters a walk loop — it iterates
+through every ZIP at that level, one by one, in population-descending order.
+
+```bash
+# Single ZIP
+media-ctl curate-news
+> 90210
+# → shows 1 ZIP, done
+
+# City level — all ZIPs in Beverly Hills CA
+> Beverly Hills CA
+# → walks each ZIP in Beverly Hills in order
+
+# County level — all ZIPs in Los Angeles County
+> Los Angeles County CA
+# → walks ~500 ZIPs in LA County, pop desc
+
+# MSA level — all ZIPs in the MSA
+> Los Angeles-Long Beach-Anaheim
+# → walks entire MSA
+
+# State level — all unassigned ZIPs in California
+> CA
+# → walks all CA ZIPs with no news_id, pop desc
+# → operator can Q to stop and resume later
+# → walker_status tracks progress
+```
+
+### Batch with --auto flag (no prompts)
+For mass-populate without operator review (uses top DOL pick automatically):
+```bash
+media-ctl curate-news --auto --state CA
+media-ctl curate-news --auto --county "Los Angeles" --state CA
+media-ctl curate-news --auto --msa "Los Angeles-Long Beach-Anaheim"
+```
+--auto mode: picks top DOL candidate, no confirmation, sets walker_status='auto'.
+Operator then does targeted review: `media-ctl curate-news --needs-review --state CA`
+
+### Level flags (alternative to freeform input)
+```bash
+media-ctl curate-news --zip 90210
+media-ctl curate-news --city "Beverly Hills" --state CA
+media-ctl curate-news --county "Los Angeles" --state CA
+media-ctl curate-news --msa "Los Angeles-Long Beach-Anaheim"
+media-ctl curate-news --cbsa "Los Angeles-Long Beach" 
+media-ctl curate-news --state CA
+media-ctl curate-news --state CA --unassigned-only
+media-ctl curate-news --state CA --needs-review
+```
