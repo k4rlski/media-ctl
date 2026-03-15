@@ -315,3 +315,134 @@ python3 media_ctl.py show --zip 90001
 python3 media_ctl.py walk --state CA --type news --needs-review
 # Expected: walk through any CA ZIPs flagged needs_review
 ```
+
+---
+
+## UPDATED: Exact Command Names & UX Flow (supersedes walk command above)
+
+### Commands
+```bash
+media-ctl curate-news   # curate newspapers of general circulation
+media-ctl curate-local  # curate local/ethnic papers
+media-ctl curate-radio  # curate radio stations
+media-ctl stats         # show assignment progress by state
+media-ctl show --zip 90210  # show current assignment for a ZIP
+```
+
+### curate-news UX Flow (exact)
+
+```
+$ media-ctl curate-news
+
+Enter a ZIP code, city, state, MSA, or CBSA for newspaper research & selection:
+> 90210
+
+ZIP: 90210 | Beverly Hills, CA | County: Los Angeles | MSA: Los Angeles-Long Beach-Anaheim
+
+Newspapers of general circulation for 90210:
+
+── PRIMARY CANDIDATE ──────────────────────────────────────────────
+Los Angeles Times
+  Circulation:  697,000 (weekday) | 1.1M (Sunday)
+  Cost/line:    $18.50 | Chars/line: 38
+  DOL PERM data: 4,231 certified PERM cases in this MSA (72% share)
+  Our cases in 90210: 8 — all used Los Angeles Times
+  Verified: 2025-11-14 | Preferred vendor: Yes
+  Contact: ads@latimes.com | (213) 237-5000
+
+── SECONDARY CANDIDATE ────────────────────────────────────────────
+Los Angeles Daily News
+  Circulation:  178,000
+  Cost/line:    $11.20 | Chars/line: 35
+  DOL PERM data: 892 certified PERM cases in this MSA (15% share)
+  Our cases in 90210: 0
+
+Select primary newspaper:
+  1. Los Angeles Times     (72% DOL share, 697K circ)
+  2. Los Angeles Daily News (15% DOL share, 178K circ)
+  3. Show more options
+> 1
+
+You selected: Los Angeles Times as primary newspaper.
+Populate now? (y/n): y
+
+✓ Set Los Angeles Times as primary newspaper for ZIP 90210.
+
+Designate a secondary newspaper (altnews)? (y/n): y
+
+Select secondary newspaper:
+  1. Los Angeles Times     (72% DOL share, 697K circ)
+  2. Los Angeles Daily News (15% DOL share, 178K circ)
+  3. Show more options
+> 2
+
+You selected: Los Angeles Daily News as secondary newspaper.
+Populate now? (y/n): y
+
+✓ Set Los Angeles Daily News as secondary newspaper for ZIP 90210.
+
+── SUMMARY ────────────────────────────────────────────────────────
+ZIP 90210 | Beverly Hills, CA
+  Primary:   Los Angeles Times
+  Secondary: Los Angeles Daily News
+
+Continue? Enter next ZIP/city/state/MSA, or [Q] to quit:
+>
+```
+
+### Input Flexibility
+The prompt accepts any of:
+- ZIP code: `90210`
+- City + state: `Beverly Hills CA` or `Beverly Hills, CA`
+- State only: `CA` → walk all unassigned ZIPs in CA in order
+- MSA name: `Los Angeles-Long Beach-Anaheim` → walk all ZIPs in MSA
+- CBSA/county: `Los Angeles County` → walk that county
+
+Resolve to ZIP(s) via `perm_intel.us_zips` table:
+- `zip` → direct lookup
+- `city + state` → `WHERE city=X AND state=Y`
+- `state only` → iterate all unassigned ZIPs in state, sorted by population DESC
+- MSA/CBSA → `WHERE msa_name LIKE '%X%'`
+
+### DOL Statistics Display
+Pull from `perm_intel.newspaper_by_zip` for the ZIP.
+If ZIP has no cases, pull MSA-level aggregate:
+```sql
+SELECT newspaper_name, SUM(case_count) as total,
+       ROUND(100*SUM(case_count)/SUM(SUM(case_count)) OVER (), 1) as pct
+FROM newspaper_by_zip
+WHERE worksite_zip = '90210'   -- or WHERE msa_name = X for MSA fallback
+GROUP BY newspaper_name
+ORDER BY total DESC
+LIMIT 10;
+```
+Show percentage share, not just raw count. "72% DOL share" is far more meaningful.
+
+### Outlet Details Display
+Pull from `perm_intel.news` (mirrored):
+```sql
+SELECT n.*, z.news_id, z.altnews_id
+FROM news n
+LEFT JOIN zip_to_media z ON z.news_id = n.id AND z.zip = '90210'
+WHERE n.state = 'CA'
+ORDER BY n.rank ASC, n.circulation DESC
+LIMIT 10;
+```
+
+### Write on confirm
+```sql
+UPDATE zip_to_media
+SET news_id = '{id}', walker_status = 'reviewed', walker_updated = NOW()
+WHERE zip = '90210';
+
+-- For secondary:
+UPDATE zip_to_media
+SET altnews_id = '{id}', walker_updated = NOW()
+WHERE zip = '90210';
+```
+
+### same flow for curate-local and curate-radio
+- `curate-local`: queries `local` table, references `local_id` / `altlocal_id`
+- `curate-radio`: queries `radio` table, references `radio_id` / `altradio_id`
+- Same DOL stats, same confirm flow, same input flexibility
+
