@@ -140,3 +140,31 @@ Chicago Reader          7fd042b673779e955  online-only since 2018; compliance gr
 - perm_intel = intelligence layer; new tables go here, not permtrak2_crm
 - Server (claw) = source of truth; git pull before changes, push after
 - "County Name County papers" = standard research search key for local paper discovery
+
+---
+
+## Ohio Market Research (2026-03-15)
+
+### Cincinnati Metro — Defunct Papers (DO NOT USE FOR PERM)
+| Paper | Closed | Notes |
+|-------|--------|-------|
+| Western Star (Lebanon OH) | 2013 | Cox shut it; Ohio's oldest weekly (est. 1806) |
+| Pulse-Journal (Mason OH) | 2013 | Merged into "Pulse of Warren County" → also defunct |
+| Community Press (Cincinnati) | May 2022 | Gannett shut all 26 suburban editions |
+| Springboro Star Press | 2013 | Cox suburban chain folded |
+
+### Cincinnati Metro — Active Papers
+| Paper | Type | Coverage | Notes |
+|-------|------|----------|-------|
+| Cincinnati Enquirer | Primary | Hamilton, Warren, Butler, Clermont, NKY | Only major daily; Sunday edition; 18,908 circ |
+| Journal-News | Local | Butler County primary, Warren County secondary | Hamilton OH; Cox; covers Mason area |
+
+### Warren County (Mason OH) Standard
+- Primary: Cincinnati Enquirer
+- Local: Journal-News (Hamilton OH) — no surviving Warren County print local
+- zip_to_media: 45040 area uses Enquirer as primary (existing assignment)
+
+### Defunct Outlet Policy
+- CRM `description` field prefixed with `"Defunct [year]."` — no schema changes
+- Bake script detects this → `defunct: true` in GeoJSON
+- Dark brown `#5c3317` pins on map — preserved for attorney/client dispute context
