@@ -517,3 +517,84 @@ The data IS the advice. "72% of certified PERM cases in this MSA used LA Times"
 is worth more than any AI opinion. The operator makes every decision.
 
 Do NOT add any AI/LLM features to this tool.
+
+---
+
+## Mass-Populate Command
+
+```bash
+# Auto-populate entire state from DOL data (no prompts)
+media-ctl populate --state CA --type news
+media-ctl populate --state CA --type local
+media-ctl populate --state CA --type radio
+
+# All types at once
+media-ctl populate --state CA --all-types
+
+# All states, all types (full DB population run)
+media-ctl populate --all
+
+# Dry run first — shows what would be written, no DB changes
+media-ctl populate --state CA --type news --dry-run
+
+# Only fill unassigned ZIPs (don't overwrite existing curated choices)
+media-ctl populate --state CA --type news --unassigned-only
+
+# Force overwrite even existing assignments
+media-ctl populate --state CA --type news --overwrite
+```
+
+### How populate works (algorithm)
+
+For each ZIP in scope, per media type:
+
+**news:**
+1. Query `newspaper_by_zip` for top newspaper by `case_count` WHERE `worksite_zip = zip`
+2. If found: fuzzy-match `newspaper_name` against `news.name` WHERE `state = zip_state`
+   using `rapidfuzz` (threshold: 85% similarity)
+3. If match confidence ≥ 85%: assign `news_id`, set `walker_status='auto'`
+4. If no ZIP-level data: fall back to county-level aggregate from `newspaper_by_zip`
+5. If no county data: fall back to MSA-level aggregate
+6. If still no match: set `walker_status='needs_review'`, skip
+
+**local:**
+1. Query `crm_outlet_history` WHERE `media_type='local' AND outlet_state=zip_state`
+   ORDER BY `total_cases DESC` — our most-used local paper in that state
+2. Geo-filter: prefer outlet WHERE city is in same county as ZIP (via `us_zips`)
+3. If match: assign `local_id`, set `walker_status='auto'`
+4. Else: `walker_status='needs_review'`
+
+**radio:**
+1. Query `crm_outlet_history` WHERE `media_type='radio' AND outlet_state=zip_state`
+2. Same geo-filter logic as local
+3. Assign or flag needs_review
+
+### Output during populate run
+```
+Populating: California | Newspaper | 2,847 ZIPs
+
+  ✓ 90001  Los Angeles Times           (DOL: 4,231 cases, 94% match)
+  ✓ 90002  Los Angeles Times           (DOL: 3,891 cases, 94% match)
+  ✓ 90210  Los Angeles Times           (DOL: 812 cases, 94% match)
+  ? 93001  Ventura County Star         (DOL: 45 cases, 78% match — needs review)
+  ✗ 96001  No DOL data for ZIP         (flagged needs_review)
+
+Summary:
+  Auto-assigned:   2,614  (91.8%)
+  Needs review:      189  ( 6.6%)
+  No data found:      44  ( 1.5%)
+
+Run: media-ctl curate-news --state CA --needs-review
+  to review the 189 flagged ZIPs manually.
+```
+
+### Post-populate review
+After `populate`, operator runs:
+```bash
+media-ctl curate-news --state CA --needs-review
+```
+This walks only the 189 flagged ZIPs interactively. Combined workflow:
+1. `populate --state CA --type news --dry-run` → verify counts
+2. `populate --state CA --type news` → bulk fill 90%+
+3. `curate-news --state CA --needs-review` → hand-review the edge cases
+4. `stats --state CA` → confirm completion
