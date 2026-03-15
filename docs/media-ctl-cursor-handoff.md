@@ -500,3 +500,20 @@ media-ctl curate-news --state CA
 media-ctl curate-news --state CA --unassigned-only
 media-ctl curate-news --state CA --needs-review
 ```
+
+---
+
+## NO AI — Hard Requirement
+
+media-ctl has zero AI involvement. No Claude, no LLM, no API calls to any AI service.
+
+Every recommendation comes exclusively from:
+1. `perm_intel.newspaper_by_zip` — DOL-certified PERM case frequency (166K rows, real data)
+2. `perm_intel.crm_outlet_history` — our own purchase history
+3. `perm_intel.news` / `local` / `radio` — outlet details (circulation, cost, rank)
+4. `perm_intel.zip_to_media` — existing curated assignments
+
+The data IS the advice. "72% of certified PERM cases in this MSA used LA Times"
+is worth more than any AI opinion. The operator makes every decision.
+
+Do NOT add any AI/LLM features to this tool.
