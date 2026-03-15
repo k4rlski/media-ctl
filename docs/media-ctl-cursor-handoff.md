@@ -598,3 +598,43 @@ This walks only the 189 flagged ZIPs interactively. Combined workflow:
 2. `populate --state CA --type news` → bulk fill 90%+
 3. `curate-news --state CA --needs-review` → hand-review the edge cases
 4. `stats --state CA` → confirm completion
+
+---
+
+## IMPORTANT: DOL Data is Reference Only — No Auto-Assign
+
+The `dol_newspaper_freq_clean` table has severe name normalization issues.
+Example — LA Times has 20+ variants:
+  "The Los Angeles Times" (14,567 cases)
+  "The La Times" (366 cases)
+  "Los Angeles Times-Daily Pilot" (49 cases)
+  "La Times, Orange County Edition" (3 cases)
+  ... etc.
+
+**DO NOT auto-assign from DOL data.** It will create garbage assignments.
+
+### What DOL data IS used for in media-ctl
+Display only — show operator the DOL statistics as research context:
+
+```
+DOL PERM data for 90210 (Beverly Hills, CA):
+  Top papers used in this ZIP (raw DOL records):
+  1. The Los Angeles Times    — 812 cases  (multiple name variants, combined)
+  2. Los Angeles Daily News   — 134 cases
+  3. Beverly Hills Courier    — 12 cases
+```
+
+The operator reads this, then makes their own selection from the clean `news` table.
+
+### --populate command: REMOVED
+The `--populate` mass-assign command is removed from scope.
+All assignments go through operator review in `curate-news` / `curate-local` / `curate-radio`.
+The tool is a curation tool, not a batch importer.
+
+### MARS Report: dol-perm-media-selections
+Build a separate read-only report page on MARS at `/ops/dol-media-report`
+- Input: ZIP or state filter
+- Shows: ZIP, city, state, top 5 DOL newspapers (raw names, case counts)
+- Purpose: research reference while using media-ctl
+- Source: `perm_intel.newspaper_by_zip` (raw DOL data, no normalization)
+- No write capability — report only
